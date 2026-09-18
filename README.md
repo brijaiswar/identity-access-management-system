@@ -1,35 +1,44 @@
 # Identity & Access Management System
-This project delivers a high-performance, secure, and scalable Identity & Access Management (IAM) System engineered with Core Java technologies and deployed in an on-premises environment. Designed to meet enterprise-grade requirements, the solution ensures robust authentication, authorization, and user lifecycle management while maintaining strict compliance with organizational security policies.
+This project delivers a secure, Java-based IAM platform built with Spring Boot, Spring Security, JPA, and JWT. It provides enterprise-ready authentication, authorization, MFA-aware login flows, and role-based access control for internal applications and custom identity workflows.
 
-# Key Features
-High Performance: Optimized Java-first architecture leveraging multi-threading, efficient caching, and connection pooling to handle large-scale user requests with minimal latency.
+## Included functionality
+- User registration and login endpoints
+- JWT-based authentication
+- Spring Security filter chain and stateless session handling
+- Role and permission model for RBAC
+- MFA support via TOTP validation
+- H2 default database configuration for local runs
+- PostgreSQL profile for production or on-prem deployment
+- Docker Compose setup for local containerized deployment
 
-Enterprise Security: Implements industry-standard protocols (OAuth2, SAML, LDAP, Kerberos) and advanced encryption techniques to safeguard credentials, sessions, and sensitive data.
+## Tech stack
+- Java 17
+- Spring Boot 3.1.2
+- Spring Web / Security / Data JPA / Validation
+- PostgreSQL / H2
+- JJWT for token generation
 
-Scalability: Modular microservice-inspired design enabling seamless horizontal and vertical scaling to support growing user bases and complex enterprise ecosystems.
+## Quick start
+1. Start the application locally:
+   ./gradlew bootRun
+2. Default seeded admin user:
+   - Username: admin
+   - Password: admin123
+3. Open the H2 console:
+   http://localhost:8080/h2-console
+4. For PostgreSQL-based deployment, run:
+   docker-compose up --build
 
-On-Premises Deployment: Tailored for organizations requiring full control over infrastructure, ensuring compliance with data residency, regulatory, and governance mandates.
+## Key API endpoints
+- POST /api/auth/register
+- POST /api/auth/login
+- GET /api/auth/me
+- POST /api/auth/validate
 
-Extensibility: API-driven integration with enterprise applications, legacy systems, and modern platforms, enabling unified identity management across diverse environments.
+## Default roles and permissions
+- ADMIN
+- USER
+- Permissions: READ_USER, WRITE_USER, DELETE_USER
 
-Resilience & Reliability: Built-in failover, clustering, and monitoring capabilities to guarantee high availability and business continuity.
-
-# Technical Highlights
-Core Java Stack: Developed using Java SE/EE, Spring Security, and Hibernate/JPA for persistence.
-
-Data Management: Supports relational and NoSQL databases for flexible identity storage.
-
-Deployment: Containerized with Docker and orchestrated via Kubernetes for efficient on-premises management.
-
-Monitoring & Auditing: Integrated with enterprise logging frameworks (ELK/EFK stack) and audit trails for compliance and forensic analysis.
-
-# Business Value
-This IAM system empowers enterprises to:
-
-Strengthen security posture by centralizing identity and access governance.
-
-Enhance user experience with streamlined authentication and single sign-on (SSO).
-
-Reduce operational overhead through automated provisioning, de-provisioning, and role-based access control (RBAC).
-
-Ensure compliance with industry regulations (e.g., GDPR, PCI-DSS, HIPAA) while retaining full control over infrastructure.
+## Notes
+This implementation is intentionally production-friendly without requiring external identity providers. You can extend it with OAuth2/OIDC, LDAP, SAML, or federation adapters depending on the target enterprise environment.
