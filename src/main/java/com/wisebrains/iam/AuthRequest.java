@@ -7,6 +7,7 @@ public class AuthRequest {
     private String username;
 
     @NotBlank
+    @jakarta.validation.constraints.Size(max = 128)
     private String password;
 
     private String mfaCode;

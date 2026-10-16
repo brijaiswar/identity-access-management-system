@@ -1,11 +1,12 @@
 package com.wisebrains.iam.auth;
 
-import com.wisebrains.iam.model.User;
 import com.wisebrains.iam.UserRepository;
+import com.wisebrains.iam.model.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import java.security.GeneralSecurityException;
 
 @Service
 public class AuthenticationService {
@@ -15,9 +16,9 @@ public class AuthenticationService {
     private final MfaService mfaService;
 
     public AuthenticationService(UserRepository userRepository,
-                                PasswordEncoder passwordEncoder,
-                                TokenService tokenService,
-                                MfaService mfaService) {
+                                 PasswordEncoder passwordEncoder,
+                                 TokenService tokenService,
+                                 MfaService mfaService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
@@ -31,6 +32,9 @@ public class AuthenticationService {
         }
 
         User user = optionalUser.get();
+        if (!user.isEnabled()) {
+            return Optional.empty();
+        }
         if (!passwordEncoder.matches(password, user.getPassword())) {
             return Optional.empty();
         }
@@ -40,7 +44,7 @@ public class AuthenticationService {
                 if (mfaCode == null || !mfaService.validateTotp(user.getMfaSecret(), Integer.parseInt(mfaCode))) {
                     return Optional.empty();
                 }
-            } catch (Exception e) {
+            } catch (GeneralSecurityException | IllegalArgumentException e) {
                 return Optional.empty();
             }
         }
@@ -52,5 +56,4 @@ public class AuthenticationService {
         return tokenService.generateJwt(user);
     }
 }
-
 

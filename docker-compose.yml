@@ -6,11 +6,16 @@ services:
     environment:
       POSTGRES_DB: iam
       POSTGRES_USER: iam_user
-      POSTGRES_PASSWORD: iam_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iam_user -d iam"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   app:
     build: .
@@ -18,12 +23,14 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: postgres
+      SPRING_PROFILES_ACTIVE: postgres,prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/iam
       SPRING_DATASOURCE_USERNAME: iam_user
-      SPRING_DATASOURCE_PASSWORD: iam_password
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

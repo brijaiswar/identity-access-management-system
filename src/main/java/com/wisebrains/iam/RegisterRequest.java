@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public class RegisterRequest {
     @NotBlank
+    @jakarta.validation.constraints.Size(min = 3, max = 100)
     private String username;
 
     @NotBlank
@@ -12,6 +13,7 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank
+    @jakarta.validation.constraints.Size(min = 12, max = 128)
     private String password;
 
     public String getUsername() {

@@ -1,10 +1,6 @@
 package com.wisebrains.iam.api;
 
-import com.wisebrains.iam.AuthRequest;
-import com.wisebrains.iam.AuthResponse;
-import com.wisebrains.iam.RegisterRequest;
-import com.wisebrains.iam.UserResponse;
-import com.wisebrains.iam.UserService;
+import com.wisebrains.iam.*;
 import com.wisebrains.iam.auth.AuthenticationService;
 import com.wisebrains.iam.auth.TokenService;
 import com.wisebrains.iam.model.Role;
@@ -13,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -54,7 +51,9 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
@@ -79,4 +78,3 @@ public class AuthController {
         return new AuthResponse(token, user.getUsername(), user.getEmail(), roles);
     }
 }
-

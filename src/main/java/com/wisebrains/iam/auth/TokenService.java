@@ -6,6 +6,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.JwtException;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -22,7 +23,13 @@ public class TokenService {
     private SecretKey signingKey;
 
     public TokenService(@Value("${jwt.secret}") String secret,
-                       @Value("${jwt.expiration-ms:3600000}") long expirationMs) {
+                        @Value("${jwt.expiration-ms:3600000}") long expirationMs) {
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalArgumentException("JWT secret must be at least 32 bytes");
+        }
+        if (expirationMs <= 0) {
+            throw new IllegalArgumentException("JWT expiration must be positive");
+        }
         this.secret = secret;
         this.expirationMs = expirationMs;
     }
@@ -61,7 +68,7 @@ public class TokenService {
                     .build()
                     .parseClaimsJws(token);
             return true;
-        } catch (Exception e) {
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
@@ -75,4 +82,3 @@ public class TokenService {
         return claims.getSubject();
     }
 }
-

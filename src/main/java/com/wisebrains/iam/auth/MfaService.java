@@ -4,8 +4,8 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.security.GeneralSecurityException;
 import java.util.Base64;
 
 @Service
@@ -19,7 +19,7 @@ public class MfaService {
         return Base64.getEncoder().encodeToString(buffer);
     }
 
-    public int generateTotp(String secret, long epochSeconds) throws Exception {
+    public int generateTotp(String secret, long epochSeconds) throws GeneralSecurityException {
         byte[] key = Base64.getDecoder().decode(secret);
         long counter = epochSeconds / TIME_STEP_SECONDS;
 
@@ -44,7 +44,11 @@ public class MfaService {
         return otp;
     }
 
-    public boolean validateTotp(String secret, int code) throws Exception {
+    public boolean validateTotp(String secret, int code) throws GeneralSecurityException {
+        if (secret == null || secret.isBlank() || code < 0 || code >= (int) Math.pow(10, CODE_DIGITS)) {
+            return false;
+        }
+
         long currentEpochSeconds = System.currentTimeMillis() / 1000L;
         int windowSize = 2;
 

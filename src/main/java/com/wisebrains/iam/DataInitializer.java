@@ -6,10 +6,12 @@ import com.wisebrains.iam.model.User;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Profile;
 
 import java.util.Set;
 
 @Component
+@Profile("!prod")
 public class DataInitializer implements CommandLineRunner {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
@@ -17,9 +19,9 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
 
     public DataInitializer(RoleRepository roleRepository,
-                          PermissionRepository permissionRepository,
-                          UserRepository userRepository,
-                          PasswordEncoder passwordEncoder) {
+                           PermissionRepository permissionRepository,
+                           UserRepository userRepository,
+                           PasswordEncoder passwordEncoder) {
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.userRepository = userRepository;
