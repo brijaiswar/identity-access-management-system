@@ -1,18 +1,19 @@
 package com.wisebrains.iam.api;
 
-import com.wisebrains.iam.AuthRequest;
-import com.wisebrains.iam.RegisterRequest;
-import com.wisebrains.iam.UserService;
-import com.wisebrains.iam.AccountLifecycleService;
-import com.wisebrains.iam.AuditEventService;
-import com.wisebrains.iam.LoginAbuseControlService;
-import com.wisebrains.iam.SessionService;
-import com.wisebrains.iam.SessionTokenResult;
-import com.wisebrains.iam.ClientAddressResolver;
+import com.wisebrains.iam.account.AccountLifecycleService;
+import com.wisebrains.iam.api.dto.AuthRequest;
+import com.wisebrains.iam.api.dto.EmailVerificationRequest;
+import com.wisebrains.iam.api.dto.RegisterRequest;
+import com.wisebrains.iam.audit.AuditEventService;
 import com.wisebrains.iam.auth.AuthenticationService;
 import com.wisebrains.iam.auth.TokenService;
 import com.wisebrains.iam.model.Role;
 import com.wisebrains.iam.model.User;
+import com.wisebrains.iam.security.ClientAddressResolver;
+import com.wisebrains.iam.security.LoginAbuseControlService;
+import com.wisebrains.iam.session.SessionService;
+import com.wisebrains.iam.user.UserService;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,13 +66,32 @@ class AuthControllerTest {
     void registersAndReturnsCreatedAuthResponse() {
         RegisterRequest request = new RegisterRequest();
         User user = user("alice");
+        when(clientAddressResolver.resolve(org.mockito.ArgumentMatchers.any())).thenReturn("127.0.0.1");
+        when(loginAbuseControlService.recordEmailAction(null, "127.0.0.1")).thenReturn(Duration.ZERO);
         when(userService.register(request)).thenReturn(user);
 
-        var response = controller.register(request);
+        var response = controller.register(request, new MockHttpServletRequest());
 
         assertEquals(202, response.getStatusCode().value());
-        assertEquals("Check your email to verify your account", response.getBody().message());
+        assertEquals("Check your email to verify your account",
+                ((com.wisebrains.iam.api.dto.RegistrationResponse) response.getBody()).message());
         org.mockito.Mockito.verify(accountLifecycleService).sendVerification(user);
+    }
+
+    @Test
+    void throttlesEmailVerificationResendWithoutCallingEmailService() {
+        EmailVerificationRequest request = new EmailVerificationRequest();
+        request.setEmail("alice@example.com");
+        MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        when(clientAddressResolver.resolve(servletRequest)).thenReturn("127.0.0.1");
+        when(loginAbuseControlService.recordEmailAction("alice@example.com", "127.0.0.1"))
+                .thenReturn(Duration.ofMinutes(5));
+
+        var response = controller.resendEmailVerification(request, servletRequest);
+
+        assertEquals(429, response.getStatusCode().value());
+        assertTrue(response.getHeaders().containsKey("Retry-After"));
+        verifyNoInteractions(accountLifecycleService);
     }
 
     @Test
@@ -115,9 +135,10 @@ class AuthControllerTest {
         when(sessionService.isActive("session-id", "alice")).thenReturn(true);
         User user = user("alice");
         when(userService.findByUsername("alice")).thenReturn(user);
-        assertEquals(Map.of("valid", true), controller.validate("Bearer " + token).getBody());
-        assertEquals(401, controller.validate(null).getStatusCode().value());
-        assertEquals(Map.of("valid", false), controller.validate("Basic token").getBody());
+        assertEquals(Map.of("valid", true), controller.validate("Bearer " + token,
+                new MockHttpServletRequest()).getBody());
+        assertEquals(401, controller.validate(null, new MockHttpServletRequest()).getStatusCode().value());
+        assertEquals(401, controller.validate("Basic token", new MockHttpServletRequest()).getStatusCode().value());
     }
 
     @Test

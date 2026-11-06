@@ -1,8 +1,11 @@
 package com.wisebrains.iam.api;
 
-import com.wisebrains.iam.UserRepository;
-import com.wisebrains.iam.MfaSecretCipher;
 import com.wisebrains.iam.model.User;
+import com.wisebrains.iam.model.AuditEvent;
+import com.wisebrains.iam.audit.AuditEventRepository;
+import com.wisebrains.iam.security.MfaSecretCipher;
+import com.wisebrains.iam.user.UserRepository;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -20,6 +23,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import java.time.Instant;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -30,6 +35,9 @@ class AdminManagementAuthorizationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private AuditEventRepository auditEventRepository;
 
     @Autowired
     private MfaSecretCipher mfaSecretCipher;
@@ -48,7 +56,9 @@ class AdminManagementAuthorizationTest {
     @WithMockUser(authorities = "READ_USER")
     void userPermissionCannotReadTheAuditTrail() throws Exception {
         mockMvc.perform(get("/api/admin/audit-events"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(403));
     }
 
     @Test
@@ -56,6 +66,24 @@ class AdminManagementAuthorizationTest {
     void auditTrailRequiresItsSpecificPermission() throws Exception {
         mockMvc.perform(get("/api/admin/audit-events"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(authorities = "AUDIT_READ")
+    void auditTrailUsesTheExplicitVersionedResponseDto() throws Exception {
+        String actorName = "audit-dto-" + java.util.UUID.randomUUID();
+        auditEventRepository.save(new AuditEvent(Instant.now(), "DTO_CONTRACT_TEST",
+                null, actorName, null, "127.0.0.1", "test-agent"));
+
+        mockMvc.perform(get("/api/v1/admin/audit-events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].actorUsername").value(actorName))
+                .andExpect(jsonPath("$.content[0].eventType").value("DTO_CONTRACT_TEST"))
+                .andExpect(jsonPath("$.content[0].userAgent").value("test-agent"))
+                .andExpect(jsonPath("$.size").isNumber())
+                .andExpect(jsonPath("$.totalElements").isNumber())
+                .andExpect(jsonPath("$.content[0].password").doesNotExist())
+                .andExpect(jsonPath("$.content[0].credentialsVersion").doesNotExist());
     }
 
     @Test

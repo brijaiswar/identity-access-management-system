@@ -3,6 +3,7 @@ package com.wisebrains.iam.authorization;
 import com.wisebrains.iam.model.Permission;
 import com.wisebrains.iam.model.Role;
 import com.wisebrains.iam.model.User;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;

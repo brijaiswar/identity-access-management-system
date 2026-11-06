@@ -16,6 +16,8 @@ internal applications and custom identity workflows.
 - Encrypted-at-rest MFA secrets and credential-change JWT revocation
 - Persisted audit events for authentication, account security changes, sessions, and administration
 - Per-username and per-client-IP login throttling with configurable lockout windows
+- Shared per-email and per-client-IP throttling for registration and public email actions
+- Versioned `/api/v1` routes with RFC 9457 error responses and OpenAPI documentation
 - Rotating, one-time refresh tokens with device/session listing, logout, and revocation
 - H2 default database configuration for local runs
 - PostgreSQL profile for production or on-prem deployment
@@ -42,6 +44,12 @@ internal applications and custom identity workflows.
    `./gradlew clean check`
 4. Open the JaCoCo report at `build/reports/jacoco/test/html/index.html`.
 
+PostgreSQL migration and integration tests use Testcontainers. They run in CI and are skipped locally
+when Docker is unavailable; see [OPERATIONS.md](OPERATIONS.md) for running the dedicated suite.
+
+Production procedures, migration/backup guidance, health checks, and operational security controls are
+documented in [OPERATIONS.md](OPERATIONS.md).
+
 ## Production deployment
 
 Production runs with the `postgres,prod` profiles, validates the schema against Flyway migrations, disables
@@ -59,11 +67,26 @@ SMTP_PASSWORD=<mail relay credential>
 IAM_LOGIN_MAX_FAILURES=5
 IAM_LOGIN_WINDOW=PT15M
 IAM_LOGIN_LOCK_DURATION=PT15M
+IAM_EMAIL_ACTION_MAX_REQUESTS=5
+IAM_EMAIL_ACTION_WINDOW=PT1H
+IAM_EMAIL_ACTION_BLOCK_DURATION=PT1H
 IAM_REFRESH_TOKEN_LIFETIME=PT720H
+IAM_TRUSTED_PROXIES=<comma-separated exact proxy peer IPs>
+IAM_API_DOCS_ENABLED=false
+DB_POOL_MAX_SIZE=20
+DB_POOL_MIN_IDLE=5
 ```
 
 Start the production compose stack with:
 `docker compose up --build`
+
+Compose binds the API and PostgreSQL ports to loopback by default. Put a TLS-terminating reverse proxy
+in front of the API and configure its trusted IPs in `IAM_TRUSTED_PROXIES`; configure the proxy to
+overwrite forwarded headers rather than append untrusted client-supplied values. To publish the API
+directly, deliberately change the API port binding and enforce TLS/network restrictions at the host
+firewall. The application container runs as a non-root user with a read-only root filesystem, dropped
+Linux capabilities, a readiness health check, and graceful shutdown. PostgreSQL data is persisted in
+the `postgres_data` volume; restrict access to that volume and database backups.
 
 Do not use the development admin credentials in production. Start PostgreSQL, then run the one-time bootstrap profile
 as an operator-controlled job. Supply these environment variables from your secret manager (never put the password in
@@ -93,33 +116,42 @@ instances should run only with `postgres,prod`.
 
 The SMTP relay sends registration/admin-created-user verification messages and password reset links. Configure
 `IAM_PUBLIC_BASE_URL` to the public API origin; the password-reset message links to a client page at
-`/reset-password?token=...`, which should call `POST /api/auth/password/reset` with the token and a new password.
+`/reset-password?token=...`, which should call `POST /api/v1/auth/password/reset` with the token and a new password.
+Email verification links put the token in a URL fragment and require the user to confirm on the
+`/api/v1/auth/email/verify` page; the initial GET does not consume the token.
 Do not log or persist raw action tokens. `MFA_ENCRYPTION_KEY` is a stable AES-256 key; back it up and keep it outside
 the database, since changing it makes existing MFA secrets unreadable.
 
 ## Key API endpoints
 
-- POST /api/auth/register
-- POST /api/auth/login
-- POST /api/auth/refresh (rotates the one-time refresh token)
-- POST /api/auth/logout
-- GET /api/auth/sessions; DELETE /api/auth/sessions/{id}; DELETE /api/auth/sessions/others
-- GET /api/auth/me
-- POST /api/auth/validate
-- GET /api/auth/email/verify?token=...
-- POST /api/auth/email/verification/resend
-- POST /api/auth/password/forgot and /api/auth/password/reset
-- POST /api/auth/password/change
-- POST /api/auth/mfa/enrollment and /api/auth/mfa/enrollment/confirm
-- POST /api/auth/mfa/recovery-codes and DELETE /api/auth/mfa
-- GET /api/admin/users (requires `USER_READ_ALL`)
-- POST /api/admin/users (requires `USER_CREATE`; new users receive `USER`)
-- PUT /api/admin/users/{id}/roles (requires `USER_ASSIGN_ROLES`)
-- PATCH /api/admin/users/{id}/enabled (requires `USER_UPDATE`)
-- GET /api/admin/roles and /api/admin/permissions (requires `ROLE_READ`)
-- POST /api/admin/roles and PUT /api/admin/roles/{id} (requires `ROLE_MANAGE`)
-- DELETE /api/admin/users/{id}/mfa (requires `USER_MFA_RESET`)
-- GET /api/admin/audit-events (requires `AUDIT_READ`)
+Detailed endpoint contracts, payloads, permissions, and response semantics are in [API.md](API.md).
+The interactive OpenAPI UI is available at `/swagger-ui.html` when enabled; production keeps API docs
+disabled by default (`IAM_API_DOCS_ENABLED=false`).
+
+- POST /api/v1/auth/register
+- POST /api/v1/auth/login
+- POST /api/v1/auth/refresh (rotates the one-time refresh token)
+- POST /api/v1/auth/logout
+- GET /api/v1/auth/sessions; DELETE /api/v1/auth/sessions/{id}; DELETE /api/v1/auth/sessions/others
+- GET /api/v1/auth/me
+- POST /api/v1/auth/validate
+- GET /api/v1/auth/email/verify (confirmation page); POST the token to the same path
+- POST /api/v1/auth/email/verification/resend
+- POST /api/v1/auth/password/forgot and /api/v1/auth/password/reset
+- POST /api/v1/auth/password/change
+- POST /api/v1/auth/mfa/enrollment and /api/v1/auth/mfa/enrollment/confirm
+- POST /api/v1/auth/mfa/recovery-codes and DELETE /api/v1/auth/mfa
+- GET /api/v1/admin/users (requires `USER_READ_ALL`)
+- POST /api/v1/admin/users (requires `USER_CREATE`; new users receive `USER`)
+- PUT /api/v1/admin/users/{id}/roles (requires `USER_ASSIGN_ROLES`)
+- PATCH /api/v1/admin/users/{id}/enabled (requires `USER_UPDATE`)
+- GET /api/v1/admin/roles and /api/v1/admin/permissions (requires `ROLE_READ`)
+- POST /api/v1/admin/roles and PUT /api/v1/admin/roles/{id} (requires `ROLE_MANAGE`)
+- DELETE /api/v1/admin/users/{id}/mfa (requires `USER_MFA_RESET`)
+- GET /api/v1/admin/audit-events (requires `AUDIT_READ`)
+
+Unversioned `/api/auth/**` and `/api/admin/**` routes remain as v1 compatibility aliases. New clients
+should use `/api/v1`; the aliases have no removal date. Error responses use `application/problem+json`.
 
 ## Default roles and permissions
 

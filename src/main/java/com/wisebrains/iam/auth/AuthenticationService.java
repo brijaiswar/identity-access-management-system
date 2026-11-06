@@ -1,8 +1,9 @@
 package com.wisebrains.iam.auth;
 
-import com.wisebrains.iam.UserRepository;
-import com.wisebrains.iam.AccountLifecycleService;
+import com.wisebrains.iam.account.AccountLifecycleService;
 import com.wisebrains.iam.model.User;
+import com.wisebrains.iam.user.UserRepository;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 

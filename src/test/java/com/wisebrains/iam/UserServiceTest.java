@@ -1,7 +1,12 @@
 package com.wisebrains.iam;
 
+import com.wisebrains.iam.api.dto.RegisterRequest;
 import com.wisebrains.iam.model.Role;
 import com.wisebrains.iam.model.User;
+import com.wisebrains.iam.role.RoleRepository;
+import com.wisebrains.iam.user.UserRepository;
+import com.wisebrains.iam.user.UserService;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -71,10 +76,11 @@ class UserServiceTest {
         request.setUsername("alice");
         request.setEmail("alice@example.com");
         when(userRepository.existsByUsername("alice")).thenReturn(true);
-        assertThrows(IllegalArgumentException.class, () -> service.register(request));
+        assertThrows(com.wisebrains.iam.api.DuplicateResourceException.class, () -> service.register(request));
 
         when(userRepository.findByUsername("missing")).thenReturn(Optional.empty());
-        assertThrows(IllegalArgumentException.class, () -> service.findByUsername("missing"));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> service.findByUsername("missing"));
     }
 
     @Test
@@ -84,6 +90,6 @@ class UserServiceTest {
         request.setEmail("alice@example.com");
         when(userRepository.existsByEmail("alice@example.com")).thenReturn(true);
 
-        assertThrows(IllegalArgumentException.class, () -> service.register(request));
+        assertThrows(com.wisebrains.iam.api.DuplicateResourceException.class, () -> service.register(request));
     }
 }

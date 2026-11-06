@@ -1,14 +1,13 @@
-version: '3.9'
 services:
   postgres:
     image: postgres:16
-    container_name: iam-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: iam
       POSTGRES_USER: iam_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,9 +18,18 @@ services:
 
   app:
     build: .
-    container_name: iam-app
+    restart: unless-stopped
+    init: true
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 40s
     environment:
       SPRING_PROFILES_ACTIVE: postgres,prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/iam
@@ -38,11 +46,23 @@ services:
       IAM_LOGIN_MAX_FAILURES: ${IAM_LOGIN_MAX_FAILURES:-5}
       IAM_LOGIN_WINDOW: ${IAM_LOGIN_WINDOW:-PT15M}
       IAM_LOGIN_LOCK_DURATION: ${IAM_LOGIN_LOCK_DURATION:-PT15M}
+      IAM_EMAIL_ACTION_MAX_REQUESTS: ${IAM_EMAIL_ACTION_MAX_REQUESTS:-5}
+      IAM_EMAIL_ACTION_WINDOW: ${IAM_EMAIL_ACTION_WINDOW:-PT1H}
+      IAM_EMAIL_ACTION_BLOCK_DURATION: ${IAM_EMAIL_ACTION_BLOCK_DURATION:-PT1H}
       IAM_REFRESH_TOKEN_LIFETIME: ${IAM_REFRESH_TOKEN_LIFETIME:-PT720H}
       IAM_TRUSTED_PROXIES: ${IAM_TRUSTED_PROXIES:-}
+      IAM_API_DOCS_ENABLED: ${IAM_API_DOCS_ENABLED:-false}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-20}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-5}
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
 
 volumes:
   postgres_data:

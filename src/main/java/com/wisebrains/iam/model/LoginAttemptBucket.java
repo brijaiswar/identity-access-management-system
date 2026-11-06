@@ -46,6 +46,19 @@ public class LoginAttemptBucket {
         if (failedAttempts >= maxAttempts) blockedUntil = lockUntil;
     }
 
+    public void recordRequest(Instant now, Instant windowStart, Instant blockUntil, int maxRequests) {
+        if ((blockedUntil != null && !blockedUntil.isAfter(now))
+                || !windowStartedAt.isAfter(windowStart)) {
+            windowStartedAt = now;
+            failedAttempts = 0;
+            blockedUntil = null;
+        }
+        failedAttempts++;
+        if (failedAttempts > maxRequests) {
+            blockedUntil = blockUntil;
+        }
+    }
+
     public void clear() {
         failedAttempts = 0;
         blockedUntil = null;

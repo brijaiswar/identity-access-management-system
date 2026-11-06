@@ -1,5 +1,7 @@
 package com.wisebrains.iam;
 
+import com.wisebrains.iam.security.LoginAbuseControlService;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;

@@ -1,14 +1,18 @@
 package com.wisebrains.iam;
 
 import com.wisebrains.iam.auth.TokenService;
-import com.wisebrains.iam.IamUserDetails;
+import com.wisebrains.iam.model.User;
+import com.wisebrains.iam.security.CustomUserDetailsService;
+import com.wisebrains.iam.security.IamUserDetails;
+import com.wisebrains.iam.security.JwtAuthenticationFilter;
+import com.wisebrains.iam.session.SessionService;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import static org.junit.jupiter.api.Assertions.*;

@@ -2,6 +2,7 @@ package com.wisebrains.iam.auth;
 
 import com.wisebrains.iam.model.Role;
 import com.wisebrains.iam.model.User;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;

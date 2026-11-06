@@ -1,0 +1,46 @@
+package com.wisebrains.iam.security;
+
+import com.wisebrains.iam.model.Role;
+import com.wisebrains.iam.model.User;
+import com.wisebrains.iam.user.UserRepository;
+
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class CustomUserDetailsService implements UserDetailsService {
+    private final UserRepository userRepository;
+
+    public CustomUserDetailsService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        for (Role role : user.getRoles()) {
+            authorities.add(new SimpleGrantedAuthority(role.getName()));
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
+            if (role.getPermissions() != null) {
+                role.getPermissions().forEach(permission ->
+                        authorities.add(new SimpleGrantedAuthority(permission.getName())));
+            }
+        }
+
+        return new IamUserDetails(
+                user.getUsername(),
+                user.getPassword(),
+                user.isEnabled(),
+                authorities,
+                user.getCredentialsVersion());
+    }
+}

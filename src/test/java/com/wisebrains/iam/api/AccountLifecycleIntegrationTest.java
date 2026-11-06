@@ -1,9 +1,10 @@
 package com.wisebrains.iam.api;
 
+import com.wisebrains.iam.audit.AuditEventRepository;
+import com.wisebrains.iam.auth.MfaService;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wisebrains.iam.auth.MfaService;
-import com.wisebrains.iam.AuditEventRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -57,8 +58,15 @@ class AccountLifecycleIntegrationTest {
 
         login(username, "Initial-Password-123!", null, 401);
 
-        String verificationToken = sentToken("/api/auth/email/verify?token=");
-        mockMvc.perform(get("/api/auth/email/verify").param("token", verificationToken))
+        String verificationToken = sentToken("#token=");
+        mockMvc.perform(get("/api/auth/email/verify"))
+                .andExpect(status().isOk());
+        login(username, "Initial-Password-123!", null, 401);
+        mockMvc.perform(post("/api/auth/email/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"token":"%s"}
+                                """.formatted(verificationToken)))
                 .andExpect(status().isOk());
         String accessToken = login(username, "Initial-Password-123!", null, 200).get("token").asText();
 
@@ -210,8 +218,14 @@ class AccountLifecycleIntegrationTest {
 
     private void registerAndVerify(String username, String email) throws Exception {
         register(username, email);
-        String verificationToken = sentToken("/api/auth/email/verify?token=");
+        String verificationToken = sentToken("#token=");
         mockMvc.perform(get("/api/auth/email/verify").param("token", verificationToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/auth/email/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"token":"%s"}
+                                """.formatted(verificationToken)))
                 .andExpect(status().isOk());
     }
 

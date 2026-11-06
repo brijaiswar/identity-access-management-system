@@ -3,6 +3,9 @@ package com.wisebrains.iam;
 import com.wisebrains.iam.model.Permission;
 import com.wisebrains.iam.model.Role;
 import com.wisebrains.iam.model.User;
+import com.wisebrains.iam.security.CustomUserDetailsService;
+import com.wisebrains.iam.user.UserRepository;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

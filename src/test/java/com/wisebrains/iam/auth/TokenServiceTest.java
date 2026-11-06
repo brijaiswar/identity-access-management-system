@@ -2,6 +2,7 @@ package com.wisebrains.iam.auth;
 
 import com.wisebrains.iam.model.Role;
 import com.wisebrains.iam.model.User;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

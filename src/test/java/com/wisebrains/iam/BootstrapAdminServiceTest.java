@@ -1,7 +1,13 @@
 package com.wisebrains.iam;
 
+import com.wisebrains.iam.api.dto.AdminUserRequest;
+import com.wisebrains.iam.bootstrap.BootstrapAdminService;
+import com.wisebrains.iam.bootstrap.SystemLockService;
 import com.wisebrains.iam.model.Role;
 import com.wisebrains.iam.model.User;
+import com.wisebrains.iam.role.RoleRepository;
+import com.wisebrains.iam.user.UserRepository;
+
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

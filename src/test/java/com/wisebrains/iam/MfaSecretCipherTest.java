@@ -1,5 +1,7 @@
 package com.wisebrains.iam;
 
+import com.wisebrains.iam.security.MfaSecretCipher;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

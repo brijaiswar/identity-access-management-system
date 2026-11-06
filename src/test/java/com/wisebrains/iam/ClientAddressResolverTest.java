@@ -1,5 +1,7 @@
 package com.wisebrains.iam;
 
+import com.wisebrains.iam.security.ClientAddressResolver;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
