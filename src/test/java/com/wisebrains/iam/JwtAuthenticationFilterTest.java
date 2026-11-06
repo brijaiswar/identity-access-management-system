@@ -18,7 +18,9 @@ import static org.mockito.Mockito.when;
 class JwtAuthenticationFilterTest {
     private final TokenService tokenService = mock(TokenService.class);
     private final CustomUserDetailsService userDetailsService = mock(CustomUserDetailsService.class);
-    private final JwtAuthenticationFilter filter = new JwtAuthenticationFilter(tokenService, userDetailsService);
+    private final SessionService sessionService = mock(SessionService.class);
+    private final JwtAuthenticationFilter filter =
+            new JwtAuthenticationFilter(tokenService, userDetailsService, sessionService);
 
     @AfterEach
     void clearSecurityContext() {
@@ -32,6 +34,8 @@ class JwtAuthenticationFilterTest {
         when(tokenService.validateJwt(token)).thenReturn(true);
         when(tokenService.getUsername(token)).thenReturn("alice");
         when(tokenService.getCredentialsVersion(token)).thenReturn(0L);
+        when(tokenService.getSessionId(token)).thenReturn("session-id");
+        when(sessionService.isActive("session-id", "alice")).thenReturn(true);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
         when(userDetailsService.loadUserByUsername("alice")).thenReturn(details);

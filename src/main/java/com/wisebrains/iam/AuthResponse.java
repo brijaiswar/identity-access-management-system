@@ -1,12 +1,17 @@
 package com.wisebrains.iam;
 
 import java.util.List;
+import java.time.Instant;
 
 public class AuthResponse {
     private String token;
     private String username;
     private String email;
     private List<String> roles;
+    private String refreshToken;
+    private long expiresIn;
+    private String sessionId;
+    private Instant refreshExpiresAt;
 
     public AuthResponse() {
     }
@@ -48,5 +53,37 @@ public class AuthResponse {
 
     public void setRoles(List<String> roles) {
         this.roles = roles;
+    }
+
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
+
+    public long getExpiresIn() {
+        return expiresIn;
+    }
+
+    public void setExpiresIn(long expiresIn) {
+        this.expiresIn = expiresIn;
+    }
+
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
+    }
+
+    public Instant getRefreshExpiresAt() {
+        return refreshExpiresAt;
+    }
+
+    public void setRefreshExpiresAt(Instant refreshExpiresAt) {
+        this.refreshExpiresAt = refreshExpiresAt;
     }
 }

@@ -3,6 +3,7 @@ package com.wisebrains.iam.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wisebrains.iam.auth.MfaService;
+import com.wisebrains.iam.AuditEventRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -41,6 +42,9 @@ class AccountLifecycleIntegrationTest {
 
     @Autowired
     private MfaService mfaService;
+
+    @Autowired
+    private AuditEventRepository auditEventRepository;
 
     @MockBean
     private JavaMailSender mailSender;
@@ -145,6 +149,63 @@ class AccountLifecycleIntegrationTest {
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isUnauthorized());
         login(username, "Changed-Password-789!", currentTotp(secret), 200);
+    }
+
+    @Test
+    void refreshRotationReuseDetectionLogoutAndAuditEventsWork() throws Exception {
+        String username = "sessions-" + UUID.randomUUID().toString().substring(0, 8);
+        registerAndVerify(username, username + "@example.com");
+
+        JsonNode firstLogin = login(username, "Initial-Password-123!", null, 200);
+        String oldAccessToken = firstLogin.get("token").asText();
+        String oldRefreshToken = firstLogin.get("refreshToken").asText();
+        String sessionId = firstLogin.get("sessionId").asText();
+        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + oldAccessToken))
+                .andExpect(status().isOk());
+
+        MvcResult refreshResponse = mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"%s"}
+                                """.formatted(oldRefreshToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.expiresIn").isNumber())
+                .andReturn();
+        JsonNode refreshed = objectMapper.readTree(refreshResponse.getResponse().getContentAsString());
+        String refreshedAccessToken = refreshed.get("token").asText();
+        String rotatedRefreshToken = refreshed.get("refreshToken").asText();
+        assertTrue(!oldRefreshToken.equals(rotatedRefreshToken));
+        assertEquals(sessionId, refreshed.get("sessionId").asText());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"%s"}
+                                """.formatted(oldRefreshToken)))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + refreshedAccessToken))
+                .andExpect(status().isUnauthorized());
+
+        JsonNode secondLogin = login(username, "Initial-Password-123!", null, 200);
+        String secondAccessToken = secondLogin.get("token").asText();
+        mockMvc.perform(get("/api/auth/sessions").header("Authorization", "Bearer " + secondAccessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(secondLogin.get("sessionId").asText()));
+        mockMvc.perform(post("/api/auth/logout").header("Authorization", "Bearer " + secondAccessToken))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + secondAccessToken))
+                .andExpect(status().isUnauthorized());
+
+        var eventNames = auditEventRepository.findAll().stream()
+                .filter(event -> username.equals(event.getActorUsername()))
+                .map(event -> event.getEventType())
+                .toList();
+        assertTrue(eventNames.contains("LOGIN_SUCCEEDED"));
+        assertTrue(eventNames.contains("SESSION_CREATED"));
+        assertTrue(eventNames.contains("SESSION_REFRESHED"));
+        assertTrue(eventNames.contains("SESSION_REFRESH_REUSE_DETECTED"));
+        assertTrue(eventNames.contains("SESSION_REVOKED"));
     }
 
     private void registerAndVerify(String username, String email) throws Exception {

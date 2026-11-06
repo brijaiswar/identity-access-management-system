@@ -4,6 +4,11 @@ import com.wisebrains.iam.AuthRequest;
 import com.wisebrains.iam.RegisterRequest;
 import com.wisebrains.iam.UserService;
 import com.wisebrains.iam.AccountLifecycleService;
+import com.wisebrains.iam.AuditEventService;
+import com.wisebrains.iam.LoginAbuseControlService;
+import com.wisebrains.iam.SessionService;
+import com.wisebrains.iam.SessionTokenResult;
+import com.wisebrains.iam.ClientAddressResolver;
 import com.wisebrains.iam.auth.AuthenticationService;
 import com.wisebrains.iam.auth.TokenService;
 import com.wisebrains.iam.model.Role;
@@ -17,6 +22,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.mock.web.MockHttpServletRequest;
+import java.time.Duration;
 
 import java.util.List;
 import java.util.Map;
@@ -24,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +45,14 @@ class AuthControllerTest {
     TokenService tokenService;
     @Mock
     AccountLifecycleService accountLifecycleService;
+    @Mock
+    SessionService sessionService;
+    @Mock
+    LoginAbuseControlService loginAbuseControlService;
+    @Mock
+    AuditEventService auditEventService;
+    @Mock
+    ClientAddressResolver clientAddressResolver;
     @InjectMocks
     AuthController controller;
 
@@ -64,8 +80,28 @@ class AuthControllerTest {
         request.setUsername("alice");
         request.setPassword("wrong");
         when(authenticationService.authenticate("alice", "wrong", null)).thenReturn(Optional.empty());
+        when(loginAbuseControlService.blockedFor("alice", "127.0.0.1")).thenReturn(Duration.ZERO);
+        when(loginAbuseControlService.recordFailure("alice", "127.0.0.1")).thenReturn(Duration.ZERO);
+        when(clientAddressResolver.resolve(org.mockito.ArgumentMatchers.any())).thenReturn("127.0.0.1");
 
-        assertEquals(401, controller.login(request).getStatusCode().value());
+        assertEquals(401, controller.login(request, new MockHttpServletRequest()).getStatusCode().value());
+    }
+
+    @Test
+    void throttledLoginReturnsRetryAfterWithoutCheckingCredentials() {
+        AuthRequest request = new AuthRequest();
+        request.setUsername("alice");
+        request.setPassword("secret");
+        MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        when(clientAddressResolver.resolve(servletRequest)).thenReturn("127.0.0.1");
+        when(loginAbuseControlService.blockedFor("alice", "127.0.0.1"))
+                .thenReturn(Duration.ofSeconds(30));
+
+        var response = controller.login(request, servletRequest);
+
+        assertEquals(429, response.getStatusCode().value());
+        assertTrue(response.getHeaders().containsKey("Retry-After"));
+        org.mockito.Mockito.verifyNoInteractions(authenticationService);
     }
 
     @Test
@@ -75,6 +111,8 @@ class AuthControllerTest {
         when(tokenService.validateJwt(token)).thenReturn(true);
         when(tokenService.getUsername(token)).thenReturn("alice");
         when(tokenService.getCredentialsVersion(token)).thenReturn(0L);
+        when(tokenService.getSessionId(token)).thenReturn("session-id");
+        when(sessionService.isActive("session-id", "alice")).thenReturn(true);
         User user = user("alice");
         when(userService.findByUsername("alice")).thenReturn(user);
         assertEquals(Map.of("valid", true), controller.validate("Bearer " + token).getBody());

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 
 public class AuthRequest {
     @NotBlank
+    @Size(max = 128)
     private String username;
 
     @NotBlank

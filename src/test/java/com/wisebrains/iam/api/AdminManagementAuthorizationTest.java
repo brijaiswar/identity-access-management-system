@@ -45,6 +45,20 @@ class AdminManagementAuthorizationTest {
     }
 
     @Test
+    @WithMockUser(authorities = "READ_USER")
+    void userPermissionCannotReadTheAuditTrail() throws Exception {
+        mockMvc.perform(get("/api/admin/audit-events"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = "AUDIT_READ")
+    void auditTrailRequiresItsSpecificPermission() throws Exception {
+        mockMvc.perform(get("/api/admin/audit-events"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @WithMockUser(authorities = "USER_READ_ALL")
     void userDirectoryRequiresAndAcceptsItsSpecificPermission() throws Exception {
         mockMvc.perform(get("/api/admin/users"))

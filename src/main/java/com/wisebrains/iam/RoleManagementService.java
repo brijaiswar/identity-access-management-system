@@ -18,10 +18,13 @@ public class RoleManagementService {
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final AuditEventService auditEventService;
 
-    public RoleManagementService(RoleRepository roleRepository, PermissionRepository permissionRepository) {
+    public RoleManagementService(RoleRepository roleRepository, PermissionRepository permissionRepository,
+                                 AuditEventService auditEventService) {
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
+        this.auditEventService = auditEventService;
     }
 
     @Transactional(readOnly = true)
@@ -51,7 +54,9 @@ public class RoleManagementService {
 
         Role role = new Role(name);
         role.setPermissions(resolvePermissions(request.getPermissions()));
-        return toResponse(roleRepository.save(role));
+        Role created = roleRepository.save(role);
+        auditEventService.recordTarget("ROLE_CREATED", currentActor(), "role", created.getId().toString());
+        return toResponse(created);
     }
 
     @Transactional
@@ -74,7 +79,9 @@ public class RoleManagementService {
 
         role.setName(name);
         role.setPermissions(resolvePermissions(request.getPermissions()));
-        return toResponse(roleRepository.save(role));
+        Role updated = roleRepository.save(role);
+        auditEventService.recordTarget("ROLE_UPDATED", currentActor(), "role", updated.getId().toString());
+        return toResponse(updated);
     }
 
     private Set<Permission> resolvePermissions(Set<String> permissionNames) {
@@ -93,6 +100,12 @@ public class RoleManagementService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String currentActor() {
+        org.springframework.security.core.Authentication actor =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return actor == null ? null : actor.getName();
     }
 
     private RoleResponse toResponse(Role role) {

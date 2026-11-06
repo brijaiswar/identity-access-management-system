@@ -20,10 +20,13 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final TokenService tokenService;
     private final CustomUserDetailsService userDetailsService;
+    private final SessionService sessionService;
 
-    public JwtAuthenticationFilter(TokenService tokenService, CustomUserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(TokenService tokenService, CustomUserDetailsService userDetailsService,
+                                   SessionService sessionService) {
         this.tokenService = tokenService;
         this.userDetailsService = userDetailsService;
+        this.sessionService = sessionService;
     }
 
     @Override
@@ -40,7 +43,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                     if (userDetails.isEnabled()
                             && tokenService.getCredentialsVersion(token)
-                            == ((IamUserDetails) userDetails).getCredentialsVersion()) {
+                            == ((IamUserDetails) userDetails).getCredentialsVersion()
+                            && sessionService.isActive(tokenService.getSessionId(token), username)) {
                         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                                 userDetails,
                                 null,

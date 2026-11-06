@@ -40,6 +40,10 @@ public class TokenService {
     }
 
     public String generateJwt(User user) {
+        return generateJwt(user, null);
+    }
+
+    public String generateJwt(User user, String sessionId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
@@ -47,15 +51,15 @@ public class TokenService {
                 .map(Role::getName)
                 .toList();
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .setSubject(user.getUsername())
                 .claim("userId", user.getId())
                 .claim("credentialsVersion", user.getCredentialsVersion())
                 .claim("roles", roles)
                 .setIssuedAt(now)
-                .setExpiration(expiry)
-                .signWith(signingKey, SignatureAlgorithm.HS256)
-                .compact();
+                .setExpiration(expiry);
+        if (sessionId != null) builder.claim("sid", sessionId);
+        return builder.signWith(signingKey, SignatureAlgorithm.HS256).compact();
     }
 
     public boolean validateJwt(String token) {
@@ -91,5 +95,18 @@ public class TokenService {
                 .getBody();
         Number version = claims.get("credentialsVersion", Number.class);
         return version == null ? -1L : version.longValue();
+    }
+
+    public String getSessionId(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.get("sid", String.class);
+    }
+
+    public long getExpirationMs() {
+        return expirationMs;
     }
 }

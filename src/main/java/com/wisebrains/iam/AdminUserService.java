@@ -22,17 +22,20 @@ public class AdminUserService {
     private final PasswordEncoder passwordEncoder;
     private final SystemLockService systemLockService;
     private final AccountLifecycleService accountLifecycleService;
+    private final AuditEventService auditEventService;
 
     public AdminUserService(UserRepository userRepository,
                             RoleRepository roleRepository,
                             PasswordEncoder passwordEncoder,
                             SystemLockService systemLockService,
-                            AccountLifecycleService accountLifecycleService) {
+                            AccountLifecycleService accountLifecycleService,
+                            AuditEventService auditEventService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.systemLockService = systemLockService;
         this.accountLifecycleService = accountLifecycleService;
+        this.auditEventService = auditEventService;
     }
 
     @Transactional(readOnly = true)
@@ -63,6 +66,7 @@ public class AdminUserService {
         user.setRoles(Set.of(userRole));
         User createdUser = userRepository.save(user);
         accountLifecycleService.sendVerification(createdUser);
+        auditEventService.record("ADMIN_USER_CREATED", null, currentActor(), createdUser.getId());
         return toResponse(createdUser);
     }
 
@@ -80,6 +84,7 @@ public class AdminUserService {
         }
 
         user.setRoles(roles);
+        auditEventService.record("ADMIN_USER_ROLES_CHANGED", null, currentActor(), user.getId());
         return toResponse(userRepository.save(user));
     }
 
@@ -95,6 +100,8 @@ public class AdminUserService {
             user.setCredentialsVersion(user.getCredentialsVersion() + 1);
         }
         user.setEnabled(enabled);
+        auditEventService.record(enabled ? "ADMIN_USER_ENABLED" : "ADMIN_USER_DISABLED",
+                null, currentActor(), user.getId());
         return toResponse(userRepository.save(user));
     }
 
@@ -137,5 +144,11 @@ public class AdminUserService {
     private UserResponse toResponse(User user) {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(),
                 user.getRoles().stream().map(Role::getName).sorted().toList(), user.isEmailVerified());
+    }
+
+    private String currentActor() {
+        org.springframework.security.core.Authentication actor =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return actor == null ? null : actor.getName();
     }
 }

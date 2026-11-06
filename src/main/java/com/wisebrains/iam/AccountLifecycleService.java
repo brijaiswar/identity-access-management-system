@@ -36,6 +36,7 @@ public class AccountLifecycleService {
     private final AccountEmailService accountEmailService;
     private final MfaService mfaService;
     private final MfaSecretCipher mfaSecretCipher;
+    private final AuditEventService auditEventService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AccountLifecycleService(UserRepository userRepository,
@@ -44,7 +45,8 @@ public class AccountLifecycleService {
                                    PasswordEncoder passwordEncoder,
                                    AccountEmailService accountEmailService,
                                    MfaService mfaService,
-                                   MfaSecretCipher mfaSecretCipher) {
+                                   MfaSecretCipher mfaSecretCipher,
+                                   AuditEventService auditEventService) {
         this.userRepository = userRepository;
         this.actionTokenRepository = actionTokenRepository;
         this.recoveryCodeRepository = recoveryCodeRepository;
@@ -52,12 +54,14 @@ public class AccountLifecycleService {
         this.accountEmailService = accountEmailService;
         this.mfaService = mfaService;
         this.mfaSecretCipher = mfaSecretCipher;
+        this.auditEventService = auditEventService;
     }
 
     @Transactional
     public void sendVerification(User user) {
         issueToken(user, EMAIL_VERIFICATION, EMAIL_VERIFICATION_LIFETIME,
                 accountEmailService::sendVerification);
+        auditEventService.record("EMAIL_VERIFICATION_SENT", user, user.getUsername(), user.getId());
     }
 
     @Transactional
@@ -65,6 +69,8 @@ public class AccountLifecycleService {
         AccountActionToken token = consumeToken(rawToken, EMAIL_VERIFICATION);
         token.getUser().setEmailVerified(true);
         userRepository.save(token.getUser());
+        auditEventService.record("EMAIL_VERIFIED", token.getUser(), token.getUser().getUsername(),
+                token.getUser().getId());
     }
 
     @Transactional
@@ -72,8 +78,10 @@ public class AccountLifecycleService {
         String normalizedEmail = normalizeEmail(email);
         Optional<User> user = userRepository.findByEmail(normalizedEmail);
         user.filter(User::isEnabled)
-                .ifPresent(account -> issueToken(account, PASSWORD_RESET, PASSWORD_RESET_LIFETIME,
-                        accountEmailService::sendPasswordReset));
+                .ifPresent(account -> {
+                    issueToken(account, PASSWORD_RESET, PASSWORD_RESET_LIFETIME, accountEmailService::sendPasswordReset);
+                    auditEventService.record("PASSWORD_RESET_REQUESTED", account, account.getUsername(), account.getId());
+                });
     }
 
     @Transactional
@@ -84,6 +92,7 @@ public class AccountLifecycleService {
         user.setCredentialsVersion(user.getCredentialsVersion() + 1);
         userRepository.save(user);
         consumeOutstandingTokens(user, PASSWORD_RESET);
+        auditEventService.record("PASSWORD_RESET", user, user.getUsername(), user.getId());
     }
 
     @Transactional
@@ -97,6 +106,7 @@ public class AccountLifecycleService {
         user.setCredentialsVersion(user.getCredentialsVersion() + 1);
         userRepository.save(user);
         consumeOutstandingTokens(user, PASSWORD_RESET);
+        auditEventService.record("PASSWORD_CHANGED", user, user.getUsername(), user.getId());
     }
 
     @Transactional
@@ -124,6 +134,7 @@ public class AccountLifecycleService {
         user.setPendingMfaSecret(mfaSecretCipher.encrypt(secret));
         user.setPendingMfaExpiresAt(Instant.now().plus(Duration.ofMinutes(10)));
         userRepository.save(user);
+        auditEventService.record("MFA_ENROLLMENT_STARTED", user, user.getUsername(), user.getId());
         String label = user.getEmail() + "?issuer=Identity%20Access%20Management";
         String uri = "otpauth://totp/" + label + "&secret=" + secret + "&algorithm=SHA1&digits=6&period=30";
         return new MfaEnrollmentResponse(secret, uri);
@@ -148,6 +159,7 @@ public class AccountLifecycleService {
         user.setMfaEnabled(true);
         user.setCredentialsVersion(user.getCredentialsVersion() + 1);
         userRepository.save(user);
+        auditEventService.record("MFA_ENROLLED", user, user.getUsername(), user.getId());
         return replaceRecoveryCodes(user);
     }
 
@@ -159,6 +171,7 @@ public class AccountLifecycleService {
         }
         user.setCredentialsVersion(user.getCredentialsVersion() + 1);
         userRepository.save(user);
+        auditEventService.record("MFA_RECOVERY_CODES_ROTATED", user, user.getUsername(), user.getId());
         return replaceRecoveryCodes(user);
     }
 
@@ -176,6 +189,7 @@ public class AccountLifecycleService {
         user.setCredentialsVersion(user.getCredentialsVersion() + 1);
         userRepository.save(user);
         recoveryCodeRepository.deleteAllByUserId(user.getId());
+        auditEventService.record("MFA_DISABLED", user, user.getUsername(), user.getId());
     }
 
     @Transactional
@@ -189,6 +203,10 @@ public class AccountLifecycleService {
         user.setCredentialsVersion(user.getCredentialsVersion() + 1);
         userRepository.save(user);
         recoveryCodeRepository.deleteAllByUserId(user.getId());
+        org.springframework.security.core.Authentication actor =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        auditEventService.record("MFA_RESET_BY_ADMIN", null,
+                actor == null ? null : actor.getName(), user.getId());
     }
 
     private List<String> replaceRecoveryCodes(User user) {

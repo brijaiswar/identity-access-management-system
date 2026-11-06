@@ -8,12 +8,15 @@ internal applications and custom identity workflows.
 
 - User registration and login endpoints
 - JWT-based authentication
-- Spring Security filter chain and stateless session handling
+- Spring Security stateless bearer requests with persisted refresh-token sessions
 - Permission-enforced user and role administration
 - One-time, operator-run production administrator bootstrap
 - Email verification and password change/reset flows with expiring, one-time tokens
 - TOTP MFA enrollment, verification, and single-use recovery codes
 - Encrypted-at-rest MFA secrets and credential-change JWT revocation
+- Persisted audit events for authentication, account security changes, sessions, and administration
+- Per-username and per-client-IP login throttling with configurable lockout windows
+- Rotating, one-time refresh tokens with device/session listing, logout, and revocation
 - H2 default database configuration for local runs
 - PostgreSQL profile for production or on-prem deployment
 - Docker Compose setup for local containerized deployment
@@ -53,6 +56,10 @@ MAIL_FROM=<verified sender address>
 SMTP_HOST=<mail relay hostname>
 SMTP_USERNAME=<mail relay account>
 SMTP_PASSWORD=<mail relay credential>
+IAM_LOGIN_MAX_FAILURES=5
+IAM_LOGIN_WINDOW=PT15M
+IAM_LOGIN_LOCK_DURATION=PT15M
+IAM_REFRESH_TOKEN_LIFETIME=PT720H
 ```
 
 Start the production compose stack with:
@@ -94,6 +101,9 @@ the database, since changing it makes existing MFA secrets unreadable.
 
 - POST /api/auth/register
 - POST /api/auth/login
+- POST /api/auth/refresh (rotates the one-time refresh token)
+- POST /api/auth/logout
+- GET /api/auth/sessions; DELETE /api/auth/sessions/{id}; DELETE /api/auth/sessions/others
 - GET /api/auth/me
 - POST /api/auth/validate
 - GET /api/auth/email/verify?token=...
@@ -109,6 +119,7 @@ the database, since changing it makes existing MFA secrets unreadable.
 - GET /api/admin/roles and /api/admin/permissions (requires `ROLE_READ`)
 - POST /api/admin/roles and PUT /api/admin/roles/{id} (requires `ROLE_MANAGE`)
 - DELETE /api/admin/users/{id}/mfa (requires `USER_MFA_RESET`)
+- GET /api/admin/audit-events (requires `AUDIT_READ`)
 
 ## Default roles and permissions
 
@@ -118,6 +129,14 @@ the database, since changing it makes existing MFA secrets unreadable.
 - The production `ADMIN` role receives the user/role administration permissions through Flyway migration.
 - User and role administration endpoints enforce named authorities, not merely authentication.
 - MFA recovery codes are shown once at enrollment or rotation; an administrator can reset a user's MFA enrollment.
+- Access tokens are short-lived JWTs (configured by `JWT_EXPIRATION_MS`); refresh tokens are random, rotating opaque
+  tokens stored only as SHA-256 hashes. Reuse of a consumed refresh token revokes its whole session. Password or MFA
+  changes invalidate all existing access and refresh sessions via the credential version.
+- Login failures are counted in the database by pseudonymous username and IP buckets, so throttling is shared across
+  app instances. Defaults block after five failures in 15 minutes for 15 minutes. Set `IAM_TRUSTED_PROXIES` to a
+  comma-separated list of exact proxy peer IPs only when those proxies overwrite `X-Forwarded-For`; the application
+  ignores forwarded headers from all other peers. Keep the audit endpoint permission-restricted and define an
+  organization-specific retention policy for audit records.
 
 ## Notes
 
