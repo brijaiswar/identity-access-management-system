@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +25,8 @@ public class AuthController {
     private final AuthenticationService authenticationService;
     private final UserService userService;
     private final TokenService tokenService;
+    @Value("${iam.registration.enabled:true}")
+    private boolean registrationEnabled = true;
 
     public AuthController(AuthenticationService authenticationService, UserService userService, TokenService tokenService) {
         this.authenticationService = authenticationService;
@@ -32,6 +36,9 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+        if (!registrationEnabled) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Registration is not available");
+        }
         User user = userService.register(request);
         String token = authenticationService.issueToken(user);
         return ResponseEntity.status(HttpStatus.CREATED).body(buildAuthResponse(user, token));

@@ -9,7 +9,8 @@ internal applications and custom identity workflows.
 - User registration and login endpoints
 - JWT-based authentication
 - Spring Security filter chain and stateless session handling
-- Role and permission model for RBAC
+- Permission-enforced user and role administration
+- One-time, operator-run production administrator bootstrap
 - MFA support via TOTP validation
 - H2 default database configuration for local runs
 - PostgreSQL profile for production or on-prem deployment
@@ -39,7 +40,7 @@ internal applications and custom identity workflows.
 ## Production deployment
 
 Production runs with the `postgres,prod` profiles, validates the schema against Flyway migrations, disables
-development seed data and the H2 console, and requires secrets from the environment:
+development seed data, public registration, and the H2 console, and requires secrets from the environment:
 
 ```text
 POSTGRES_PASSWORD=<strong database password>
@@ -49,8 +50,31 @@ JWT_SECRET=<at least 32 characters>
 Start the production compose stack with:
 `docker compose up --build`
 
-Do not use the development admin credentials in production. Provision the first administrator through a controlled
-deployment or database bootstrap process.
+Do not use the development admin credentials in production. Start PostgreSQL, then run the one-time bootstrap profile
+as an operator-controlled job. Supply these environment variables from your secret manager (never put the password in
+shell history or a committed file):
+
+```text
+SPRING_PROFILES_ACTIVE=postgres,prod,bootstrap-admin
+IAM_BOOTSTRAP_ADMIN_USERNAME=<initial administrator username>
+IAM_BOOTSTRAP_ADMIN_EMAIL=<initial administrator email>
+IAM_BOOTSTRAP_ADMIN_PASSWORD=<unique password of at least 12 characters>
+```
+
+Run the app service once with those variables available in the operator shell:
+
+```sh
+docker compose run --rm --no-deps \
+  -e SPRING_PROFILES_ACTIVE=postgres,prod,bootstrap-admin \
+  -e IAM_BOOTSTRAP_ADMIN_USERNAME \
+  -e IAM_BOOTSTRAP_ADMIN_EMAIL \
+  -e IAM_BOOTSTRAP_ADMIN_PASSWORD \
+  app
+```
+
+The bootstrap uses a database lock and refuses to create an administrator if any user already exists. The bootstrap
+profile does not start the HTTP server. Unset the bootstrap credentials after the command completes; normal service
+instances should run only with `postgres,prod`.
 
 ## Key API endpoints
 
@@ -58,12 +82,20 @@ deployment or database bootstrap process.
 - POST /api/auth/login
 - GET /api/auth/me
 - POST /api/auth/validate
+- GET /api/admin/users (requires `USER_READ_ALL`)
+- POST /api/admin/users (requires `USER_CREATE`; new users receive `USER`)
+- PUT /api/admin/users/{id}/roles (requires `USER_ASSIGN_ROLES`)
+- PATCH /api/admin/users/{id}/enabled (requires `USER_UPDATE`)
+- GET /api/admin/roles and /api/admin/permissions (requires `ROLE_READ`)
+- POST /api/admin/roles and PUT /api/admin/roles/{id} (requires `ROLE_MANAGE`)
 
 ## Default roles and permissions
 
 - ADMIN
 - USER
-- Permissions: READ_USER, WRITE_USER, DELETE_USER
+- Built-in `ADMIN` and `USER` roles are protected from modification.
+- The production `ADMIN` role receives the user/role administration permissions through Flyway migration.
+- User and role administration endpoints enforce named authorities, not merely authentication.
 
 ## Notes
 

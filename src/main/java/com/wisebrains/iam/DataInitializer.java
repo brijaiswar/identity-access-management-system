@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.context.annotation.Profile;
 
 import java.util.Set;
+import java.util.HashSet;
+import java.util.List;
 
 @Component
 @Profile("!prod")
@@ -30,24 +32,25 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        Permission readUser = permissionRepository.findByName("READ_USER").orElseGet(() ->
-                permissionRepository.save(new Permission("READ_USER", "user", "read")));
-        Permission writeUser = permissionRepository.findByName("WRITE_USER").orElseGet(() ->
-                permissionRepository.save(new Permission("WRITE_USER", "user", "write")));
-        Permission deleteUser = permissionRepository.findByName("DELETE_USER").orElseGet(() ->
-                permissionRepository.save(new Permission("DELETE_USER", "user", "delete")));
+        List<Permission> permissions = List.of(
+                permission("READ_USER", "user", "read"),
+                permission("WRITE_USER", "user", "write"),
+                permission("DELETE_USER", "user", "delete"),
+                permission("USER_READ_ALL", "users", "read"),
+                permission("USER_CREATE", "users", "create"),
+                permission("USER_UPDATE", "users", "update"),
+                permission("USER_ASSIGN_ROLES", "users", "assign_roles"),
+                permission("ROLE_READ", "roles", "read"),
+                permission("ROLE_MANAGE", "roles", "manage"));
 
-        Role adminRole = roleRepository.findByName("ADMIN").orElseGet(() -> {
-            Role role = new Role("ADMIN");
-            role.setPermissions(Set.of(readUser, writeUser, deleteUser));
-            return roleRepository.save(role);
-        });
+        Role adminRole = roleRepository.findByName("ADMIN").orElseGet(() -> roleRepository.save(new Role("ADMIN")));
+        adminRole.setPermissions(new HashSet<>(permissions));
+        roleRepository.save(adminRole);
 
-        Role userRole = roleRepository.findByName("USER").orElseGet(() -> {
-            Role role = new Role("USER");
-            role.setPermissions(Set.of(readUser));
-            return roleRepository.save(role);
-        });
+        Permission readUser = permissions.get(0);
+        Role userRole = roleRepository.findByName("USER").orElseGet(() -> roleRepository.save(new Role("USER")));
+        userRole.setPermissions(Set.of(readUser));
+        roleRepository.save(userRole);
 
         if (userRepository.findByUsername("admin").isEmpty()) {
             User admin = new User();
@@ -58,5 +61,10 @@ public class DataInitializer implements CommandLineRunner {
             admin.setRoles(Set.of(adminRole, userRole));
             userRepository.save(admin);
         }
+    }
+
+    private Permission permission(String name, String resource, String action) {
+        return permissionRepository.findByName(name)
+                .orElseGet(() -> permissionRepository.save(new Permission(name, resource, action)));
     }
 }
