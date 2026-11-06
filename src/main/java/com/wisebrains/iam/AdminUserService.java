@@ -21,15 +21,18 @@ public class AdminUserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final SystemLockService systemLockService;
+    private final AccountLifecycleService accountLifecycleService;
 
     public AdminUserService(UserRepository userRepository,
                             RoleRepository roleRepository,
                             PasswordEncoder passwordEncoder,
-                            SystemLockService systemLockService) {
+                            SystemLockService systemLockService,
+                            AccountLifecycleService accountLifecycleService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.systemLockService = systemLockService;
+        this.accountLifecycleService = accountLifecycleService;
     }
 
     @Transactional(readOnly = true)
@@ -58,7 +61,9 @@ public class AdminUserService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setEnabled(true);
         user.setRoles(Set.of(userRole));
-        return toResponse(userRepository.save(user));
+        User createdUser = userRepository.save(user);
+        accountLifecycleService.sendVerification(createdUser);
+        return toResponse(createdUser);
     }
 
     @Transactional
@@ -86,8 +91,16 @@ public class AdminUserService {
                 && userRepository.countEnabledByRoleName("ADMIN") <= 1) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot disable the last enabled administrator");
         }
+        if (user.isEnabled() != enabled) {
+            user.setCredentialsVersion(user.getCredentialsVersion() + 1);
+        }
         user.setEnabled(enabled);
         return toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public void resetMfa(long id) {
+        accountLifecycleService.resetMfaByAdministrator(id);
     }
 
     private User findUser(long id) {
@@ -123,6 +136,6 @@ public class AdminUserService {
 
     private UserResponse toResponse(User user) {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(),
-                user.getRoles().stream().map(Role::getName).sorted().toList());
+                user.getRoles().stream().map(Role::getName).sorted().toList(), user.isEmailVerified());
     }
 }

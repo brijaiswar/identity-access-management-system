@@ -12,6 +12,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,5 +60,12 @@ public class AdminUserController {
     @PreAuthorize("hasAuthority('USER_UPDATE')")
     public UserResponse setEnabled(@PathVariable long id, @Valid @RequestBody UserEnabledRequest request) {
         return adminUserService.setEnabled(id, request.getEnabled());
+    }
+
+    @DeleteMapping("/{id}/mfa")
+    @PreAuthorize("hasAuthority('USER_MFA_RESET')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetMfa(@PathVariable long id) {
+        adminUserService.resetMfa(id);
     }
 }

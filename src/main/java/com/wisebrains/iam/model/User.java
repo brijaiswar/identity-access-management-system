@@ -2,6 +2,7 @@ package com.wisebrains.iam.model;
 
 import jakarta.persistence.*;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -25,10 +26,22 @@ public class User {
     private boolean enabled = true;
 
     @Column(nullable = false)
+    private boolean emailVerified;
+
+    @Column(nullable = false)
     private boolean mfaEnabled = false;
 
     @Column
     private String mfaSecret;
+
+    @Column
+    private String pendingMfaSecret;
+
+    @Column
+    private Instant pendingMfaExpiresAt;
+
+    @Column(nullable = false)
+    private long credentialsVersion;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
@@ -87,6 +100,14 @@ public class User {
         this.enabled = enabled;
     }
 
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        this.emailVerified = emailVerified;
+    }
+
     public boolean isMfaEnabled() {
         return mfaEnabled;
     }
@@ -103,6 +124,30 @@ public class User {
         this.mfaSecret = mfaSecret;
     }
 
+    public String getPendingMfaSecret() {
+        return pendingMfaSecret;
+    }
+
+    public void setPendingMfaSecret(String pendingMfaSecret) {
+        this.pendingMfaSecret = pendingMfaSecret;
+    }
+
+    public Instant getPendingMfaExpiresAt() {
+        return pendingMfaExpiresAt;
+    }
+
+    public void setPendingMfaExpiresAt(Instant pendingMfaExpiresAt) {
+        this.pendingMfaExpiresAt = pendingMfaExpiresAt;
+    }
+
+    public long getCredentialsVersion() {
+        return credentialsVersion;
+    }
+
+    public void setCredentialsVersion(long credentialsVersion) {
+        this.credentialsVersion = credentialsVersion;
+    }
+
     public Set<Role> getRoles() {
         return roles;
     }
@@ -111,5 +156,3 @@ public class User {
         this.roles = roles;
     }
 }
-
-

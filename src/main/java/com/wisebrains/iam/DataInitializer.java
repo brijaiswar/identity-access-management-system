@@ -40,6 +40,7 @@ public class DataInitializer implements CommandLineRunner {
                 permission("USER_CREATE", "users", "create"),
                 permission("USER_UPDATE", "users", "update"),
                 permission("USER_ASSIGN_ROLES", "users", "assign_roles"),
+                permission("USER_MFA_RESET", "users", "mfa_reset"),
                 permission("ROLE_READ", "roles", "read"),
                 permission("ROLE_MANAGE", "roles", "manage"));
 
@@ -58,6 +59,7 @@ public class DataInitializer implements CommandLineRunner {
             admin.setEmail("admin@wisebrains.com");
             admin.setPassword(passwordEncoder.encode("admin123"));
             admin.setEnabled(true);
+            admin.setEmailVerified(true);
             admin.setRoles(Set.of(adminRole, userRole));
             userRepository.save(admin);
         }

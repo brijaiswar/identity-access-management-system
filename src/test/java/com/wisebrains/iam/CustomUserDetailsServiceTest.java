@@ -28,6 +28,7 @@ class CustomUserDetailsServiceTest {
         Role role = new Role("ADMIN");
         role.setPermissions(Set.of(new Permission("READ_USER", "user", "read")));
         User user = new User("alice", "encoded", "alice@example.com");
+        user.setEmailVerified(true);
         user.setRoles(Set.of(role));
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
 

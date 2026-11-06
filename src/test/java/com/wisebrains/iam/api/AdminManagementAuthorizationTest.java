@@ -1,6 +1,7 @@
 package com.wisebrains.iam.api;
 
 import com.wisebrains.iam.UserRepository;
+import com.wisebrains.iam.MfaSecretCipher;
 import com.wisebrains.iam.model.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mail.javamail.JavaMailSender;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -27,6 +30,12 @@ class AdminManagementAuthorizationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private MfaSecretCipher mfaSecretCipher;
+
+    @MockBean
+    private JavaMailSender mailSender;
 
     @Test
     @WithMockUser(authorities = "READ_USER")
@@ -94,6 +103,24 @@ class AdminManagementAuthorizationTest {
                                 {"roles":["USER"]}
                                 """))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser(authorities = "USER_MFA_RESET")
+    void administratorCanResetMfaAndRevokeExistingTokens() throws Exception {
+        User administrator = userRepository.findByUsername("admin").orElseThrow();
+        administrator.setMfaEnabled(true);
+        administrator.setMfaSecret(mfaSecretCipher.encrypt("JBSWY3DPEHPK3PXP"));
+        long credentialsVersion = administrator.getCredentialsVersion();
+        userRepository.save(administrator);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/admin/users/{id}/mfa", administrator.getId()))
+                .andExpect(status().isNoContent());
+
+        User updated = userRepository.findById(administrator.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertFalse(updated.isMfaEnabled());
+        org.junit.jupiter.api.Assertions.assertEquals(credentialsVersion + 1, updated.getCredentialsVersion());
     }
 
     @Test

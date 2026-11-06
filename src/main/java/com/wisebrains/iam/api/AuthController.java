@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -25,23 +26,30 @@ public class AuthController {
     private final AuthenticationService authenticationService;
     private final UserService userService;
     private final TokenService tokenService;
+    private final AccountLifecycleService accountLifecycleService;
     @Value("${iam.registration.enabled:true}")
     private boolean registrationEnabled = true;
 
-    public AuthController(AuthenticationService authenticationService, UserService userService, TokenService tokenService) {
+    public AuthController(AuthenticationService authenticationService,
+                          UserService userService,
+                          TokenService tokenService,
+                          AccountLifecycleService accountLifecycleService) {
         this.authenticationService = authenticationService;
         this.userService = userService;
         this.tokenService = tokenService;
+        this.accountLifecycleService = accountLifecycleService;
     }
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    @Transactional
+    public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody RegisterRequest request) {
         if (!registrationEnabled) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Registration is not available");
         }
         User user = userService.register(request);
-        String token = authenticationService.issueToken(user);
-        return ResponseEntity.status(HttpStatus.CREATED).body(buildAuthResponse(user, token));
+        accountLifecycleService.sendVerification(user);
+        return ResponseEntity.accepted()
+                .body(new RegistrationResponse("Check your email to verify your account", user.getUsername()));
     }
 
     @PostMapping("/login")
@@ -66,7 +74,7 @@ public class AuthController {
 
         User user = userService.findByUsername(authentication.getName());
         return ResponseEntity.ok(new UserResponse(user.getId(), user.getUsername(), user.getEmail(),
-                user.getRoles().stream().map(Role::getName).toList()));
+                user.getRoles().stream().map(Role::getName).toList(), user.isEmailVerified()));
     }
 
     @PostMapping("/validate")
@@ -77,11 +85,27 @@ public class AuthController {
 
         String token = authorizationHeader.substring(7);
         boolean valid = tokenService.validateJwt(token);
+        if (valid) {
+            try {
+                User user = userService.findByUsername(tokenService.getUsername(token));
+                valid = user.isEnabled() && tokenService.getCredentialsVersion(token) == user.getCredentialsVersion();
+            } catch (IllegalArgumentException exception) {
+                valid = false;
+            }
+        }
         return ResponseEntity.ok(Map.of("valid", valid));
     }
 
     private AuthResponse buildAuthResponse(User user, String token) {
         List<String> roles = user.getRoles().stream().map(Role::getName).toList();
         return new AuthResponse(token, user.getUsername(), user.getEmail(), roles);
+    }
+
+    @PostMapping("/email/verification/resend")
+    public ResponseEntity<Map<String, String>> resendEmailVerification(
+            @Valid @RequestBody EmailVerificationRequest request) {
+        accountLifecycleService.resendEmailVerification(request.getEmail());
+        return ResponseEntity.accepted()
+                .body(Map.of("message", "If the account requires verification, instructions will be sent"));
     }
 }

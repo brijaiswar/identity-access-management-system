@@ -50,6 +50,7 @@ public class TokenService {
         return Jwts.builder()
                 .setSubject(user.getUsername())
                 .claim("userId", user.getId())
+                .claim("credentialsVersion", user.getCredentialsVersion())
                 .claim("roles", roles)
                 .setIssuedAt(now)
                 .setExpiration(expiry)
@@ -80,5 +81,15 @@ public class TokenService {
                 .parseClaimsJws(token)
                 .getBody();
         return claims.getSubject();
+    }
+
+    public long getCredentialsVersion(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        Number version = claims.get("credentialsVersion", Number.class);
+        return version == null ? -1L : version.longValue();
     }
 }

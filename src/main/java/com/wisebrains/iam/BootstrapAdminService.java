@@ -68,6 +68,7 @@ public class BootstrapAdminService {
         administrator.setEmail(normalizedEmail);
         administrator.setPassword(passwordEncoder.encode(password));
         administrator.setEnabled(true);
+        administrator.setEmailVerified(true);
         administrator.setRoles(Set.of(adminRole));
         userRepository.save(administrator);
     }

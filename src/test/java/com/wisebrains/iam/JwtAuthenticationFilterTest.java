@@ -1,6 +1,7 @@
 package com.wisebrains.iam;
 
 import com.wisebrains.iam.auth.TokenService;
+import com.wisebrains.iam.IamUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
@@ -26,10 +27,11 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void authenticatesRequestWithValidBearerToken() throws Exception {
-        UserDetails details = User.withUsername("alice").password("x").roles("USER").build();
+        UserDetails details = new IamUserDetails("alice", "x", true, java.util.List.of(), 0L);
         String token = "tok" + "en";
         when(tokenService.validateJwt(token)).thenReturn(true);
         when(tokenService.getUsername(token)).thenReturn("alice");
+        when(tokenService.getCredentialsVersion(token)).thenReturn(0L);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
         when(userDetailsService.loadUserByUsername("alice")).thenReturn(details);

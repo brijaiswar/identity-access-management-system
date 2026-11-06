@@ -1,7 +1,7 @@
 package com.wisebrains.iam;
 
 import com.wisebrains.iam.auth.AuthenticationService;
-import com.wisebrains.iam.auth.MfaService;
+import com.wisebrains.iam.AccountLifecycleService;
 import com.wisebrains.iam.auth.TokenService;
 import com.wisebrains.iam.model.User;
 import org.junit.jupiter.api.Test;
@@ -29,13 +29,14 @@ class AuthenticationServiceTest {
     @Mock
     TokenService tokenService;
     @Mock
-    MfaService mfaService;
+    AccountLifecycleService accountLifecycleService;
     @InjectMocks
     AuthenticationService service;
 
     @Test
     void authenticatesUserWithValidPassword() {
         User user = new User("alice", "encoded", "alice@example.com");
+        user.setEmailVerified(true);
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret", "encoded")).thenReturn(true);
 
@@ -48,6 +49,7 @@ class AuthenticationServiceTest {
         assertTrue(service.authenticate("missing", "secret", null).isEmpty());
 
         User user = new User("alice", "encoded", "alice@example.com");
+        user.setEmailVerified(true);
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(anyString(), eq("encoded"))).thenReturn(false);
         assertTrue(service.authenticate("alice", "wrong", null).isEmpty());
@@ -56,6 +58,7 @@ class AuthenticationServiceTest {
     @Test
     void rejectsDisabledUserEvenWithValidPassword() {
         User user = new User("alice", "encoded", "alice@example.com");
+        user.setEmailVerified(true);
         user.setEnabled(false);
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
 
@@ -66,11 +69,13 @@ class AuthenticationServiceTest {
     @Test
     void requiresValidMfaForMfaEnabledUser() throws Exception {
         User user = new User("alice", "encoded", "alice@example.com");
+        user.setEmailVerified(true);
         user.setMfaEnabled(true);
-        user.setMfaSecret("secret");
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret", "encoded")).thenReturn(true);
-        when(mfaService.validateTotp("secret", 123456)).thenReturn(true);
+        when(accountLifecycleService.verifyMfaForAuthentication(user, "123456")).thenReturn(true);
+        when(accountLifecycleService.verifyMfaForAuthentication(user, null)).thenReturn(false);
+        when(accountLifecycleService.verifyMfaForAuthentication(user, "invalid")).thenReturn(false);
 
         assertEquals(Optional.of(user), service.authenticate("alice", "secret", "123456"));
         assertTrue(service.authenticate("alice", "secret", null).isEmpty());

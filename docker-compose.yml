@@ -28,6 +28,13 @@ services:
       SPRING_DATASOURCE_USERNAME: iam_user
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?MFA_ENCRYPTION_KEY must be set}
+      IAM_PUBLIC_BASE_URL: ${IAM_PUBLIC_BASE_URL:?IAM_PUBLIC_BASE_URL must be set}
+      MAIL_FROM: ${MAIL_FROM:?MAIL_FROM must be set}
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST must be set}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:?SMTP_USERNAME must be set}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?SMTP_PASSWORD must be set}
     depends_on:
       postgres:
         condition: service_healthy

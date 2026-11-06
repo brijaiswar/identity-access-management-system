@@ -3,6 +3,7 @@ package com.wisebrains.iam.api;
 import com.wisebrains.iam.AuthRequest;
 import com.wisebrains.iam.RegisterRequest;
 import com.wisebrains.iam.UserService;
+import com.wisebrains.iam.AccountLifecycleService;
 import com.wisebrains.iam.auth.AuthenticationService;
 import com.wisebrains.iam.auth.TokenService;
 import com.wisebrains.iam.model.Role;
@@ -34,6 +35,8 @@ class AuthControllerTest {
     UserService userService;
     @Mock
     TokenService tokenService;
+    @Mock
+    AccountLifecycleService accountLifecycleService;
     @InjectMocks
     AuthController controller;
 
@@ -47,13 +50,12 @@ class AuthControllerTest {
         RegisterRequest request = new RegisterRequest();
         User user = user("alice");
         when(userService.register(request)).thenReturn(user);
-        when(authenticationService.issueToken(user)).thenReturn("token");
 
         var response = controller.register(request);
 
-        assertEquals(201, response.getStatusCode().value());
-        assertEquals("token", response.getBody().getToken());
-        assertEquals(List.of("USER"), response.getBody().getRoles());
+        assertEquals(202, response.getStatusCode().value());
+        assertEquals("Check your email to verify your account", response.getBody().message());
+        org.mockito.Mockito.verify(accountLifecycleService).sendVerification(user);
     }
 
     @Test
@@ -71,6 +73,10 @@ class AuthControllerTest {
         String token = "tok" + "en";
 
         when(tokenService.validateJwt(token)).thenReturn(true);
+        when(tokenService.getUsername(token)).thenReturn("alice");
+        when(tokenService.getCredentialsVersion(token)).thenReturn(0L);
+        User user = user("alice");
+        when(userService.findByUsername("alice")).thenReturn(user);
         assertEquals(Map.of("valid", true), controller.validate("Bearer " + token).getBody());
         assertEquals(401, controller.validate(null).getStatusCode().value());
         assertEquals(Map.of("valid", false), controller.validate("Basic token").getBody());
@@ -111,6 +117,7 @@ class AuthControllerTest {
 
     private User user(String username) {
         User user = new User(username, "hash", username + "@example.com");
+        user.setEmailVerified(true);
         user.setRoles(Set.of(new Role("USER")));
         return user;
     }

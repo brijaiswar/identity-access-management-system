@@ -1,6 +1,7 @@
 package com.wisebrains.iam;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public class AuthRequest {
     @NotBlank
@@ -10,6 +11,7 @@ public class AuthRequest {
     @jakarta.validation.constraints.Size(max = 128)
     private String password;
 
+    @Size(max = 32)
     private String mfaCode;
 
     public String getUsername() {

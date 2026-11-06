@@ -7,15 +7,17 @@ public class UserResponse {
     private String username;
     private String email;
     private List<String> roles;
+    private boolean emailVerified;
 
     public UserResponse() {
     }
 
-    public UserResponse(Long id, String username, String email, List<String> roles) {
+    public UserResponse(Long id, String username, String email, List<String> roles, boolean emailVerified) {
         this.id = id;
         this.username = username;
         this.email = email;
         this.roles = roles;
+        this.emailVerified = emailVerified;
     }
 
     public Long getId() {
@@ -48,5 +50,13 @@ public class UserResponse {
 
     public void setRoles(List<String> roles) {
         this.roles = roles;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        this.emailVerified = emailVerified;
     }
 }

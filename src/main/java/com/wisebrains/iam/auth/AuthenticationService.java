@@ -1,28 +1,28 @@
 package com.wisebrains.iam.auth;
 
 import com.wisebrains.iam.UserRepository;
+import com.wisebrains.iam.AccountLifecycleService;
 import com.wisebrains.iam.model.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
-import java.security.GeneralSecurityException;
 
 @Service
 public class AuthenticationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
-    private final MfaService mfaService;
+    private final AccountLifecycleService accountLifecycleService;
 
     public AuthenticationService(UserRepository userRepository,
                                  PasswordEncoder passwordEncoder,
                                  TokenService tokenService,
-                                 MfaService mfaService) {
+                                 AccountLifecycleService accountLifecycleService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
-        this.mfaService = mfaService;
+        this.accountLifecycleService = accountLifecycleService;
     }
 
     public Optional<User> authenticate(String username, String password, String mfaCode) {
@@ -35,16 +35,15 @@ public class AuthenticationService {
         if (!user.isEnabled()) {
             return Optional.empty();
         }
+        if (!user.isEmailVerified()) {
+            return Optional.empty();
+        }
         if (!passwordEncoder.matches(password, user.getPassword())) {
             return Optional.empty();
         }
 
         if (user.isMfaEnabled()) {
-            try {
-                if (mfaCode == null || !mfaService.validateTotp(user.getMfaSecret(), Integer.parseInt(mfaCode))) {
-                    return Optional.empty();
-                }
-            } catch (GeneralSecurityException | IllegalArgumentException e) {
+            if (!accountLifecycleService.verifyMfaForAuthentication(user, mfaCode)) {
                 return Optional.empty();
             }
         }
@@ -56,4 +55,3 @@ public class AuthenticationService {
         return tokenService.generateJwt(user);
     }
 }
-
