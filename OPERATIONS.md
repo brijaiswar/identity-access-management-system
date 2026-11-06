@@ -57,9 +57,11 @@ backup encryption keys separate from application keys.
   database-backed limit of five requests per normalized email and source IP per hour, followed by a
   one-hour block. Tune with `IAM_EMAIL_ACTION_MAX_REQUESTS`, `IAM_EMAIL_ACTION_WINDOW`, and
   `IAM_EMAIL_ACTION_BLOCK_DURATION`; ensure upstream ingress protections also cover public endpoints.
-- Use the versioned `/api/v1` routes for new clients. Existing `/api/auth/**` and `/api/admin/**`
-  routes are retained as v1 compatibility aliases; no removal date is set. Breaking API changes
-  require a new versioned route and published migration guidance.
+- Use the versioned `/api/v1` routes for new clients. Responses identify the contract with
+  `API-Version: 1`. Existing `/api/auth/**` and `/api/admin/**` routes are retained as v1
+  compatibility aliases and return a `Link` header pointing to the equivalent canonical route.
+  Breaking API changes require a new major route prefix and published migration guidance; announce
+  a sunset date before retiring any compatibility alias.
 - Refresh tokens are one-time rotating secrets. Clients must atomically replace them on refresh and
   discard the prior value. A detected replay revokes the affected session. Password or MFA changes
   invalidate sessions through the credential version.

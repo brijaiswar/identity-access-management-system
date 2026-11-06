@@ -16,7 +16,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("Identity Access Management API")
-                        .description("Versioned IAM API for authentication, account lifecycle, session management, and RBAC administration.")
+                        .description("Versioned IAM API for authentication, account lifecycle, session management, and RBAC administration. Canonical routes use /api/v1; API responses identify the contract with the API-Version header.")
                         .version("1.0.0")
                         .contact(new Contact().name("IAM Operations")))
                 .components(new Components().addSecuritySchemes("bearerAuth",

@@ -1,9 +1,15 @@
 # IAM HTTP API
 
 The canonical API base is `/api/v1`. The version in the URL identifies the contract's major version;
-backward-incompatible changes require a new version. Existing `/api/auth/**` and `/api/admin/**`
-routes remain as compatibility aliases for v1, but are omitted from OpenAPI and new integrations
-should use `/api/v1`. No removal date is set for the aliases.
+backward-incompatible changes require a new version (for example, `/api/v2`). Additive, backward-compatible
+changes may be released within the current major version. The OpenAPI document describes the canonical
+versioned contract.
+
+Existing `/api/auth/**` and `/api/admin/**` routes remain as compatibility aliases for v1 and are
+omitted from OpenAPI. They return `API-Version: 1` and a `Link` header with
+`rel="successor-version"` pointing to the equivalent `/api/v1` route. These headers are migration
+signals; they do not indicate a scheduled removal. Any future alias retirement must be announced
+with migration guidance and a sunset date before removal. New integrations should use `/api/v1`.
 
 JSON request bodies use `Content-Type: application/json`. Authenticated endpoints require
 `Authorization: Bearer <access-token>`. Access tokens are short-lived; keep the returned refresh

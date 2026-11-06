@@ -150,8 +150,10 @@ disabled by default (`IAM_API_DOCS_ENABLED=false`).
 - DELETE /api/v1/admin/users/{id}/mfa (requires `USER_MFA_RESET`)
 - GET /api/v1/admin/audit-events (requires `AUDIT_READ`)
 
-Unversioned `/api/auth/**` and `/api/admin/**` routes remain as v1 compatibility aliases. New clients
-should use `/api/v1`; the aliases have no removal date. Error responses use `application/problem+json`.
+Unversioned `/api/auth/**` and `/api/admin/**` routes remain as v1 compatibility aliases and return
+headers identifying v1 and linking to the equivalent `/api/v1` route. New clients should use
+`/api/v1`; no alias retirement is scheduled. Breaking changes require a new major URL prefix and
+published migration guidance. Error responses use `application/problem+json`.
 
 ## Default roles and permissions
 
